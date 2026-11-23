@@ -46,6 +46,9 @@
     background: rgba(0,0,0,0.45); color: #fff; font-size: 14px; outline: none; margin-bottom: 12px;
   }
   input:focus { border-color: var(--gold); }
+  .pin-field {
+    text-align: center; font-size: 20px; letter-spacing: 6px; font-weight: 800;
+  }
   .btn {
     width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: 900;
     cursor: pointer; font-size: 14px; transition: 0.2s;
@@ -105,8 +108,8 @@
 <div id="loginGate">
   <div class="login-box">
     <h2>⚡ CRIC CLASH ADMIN</h2>
-    <p>Enter Admin PIN or Sign in with Admin Google</p>
-    <input type="password" id="pinInput" placeholder="Admin Secret PIN (Default: 2026)">
+    <p>Authorized Access Only</p>
+    <input type="password" id="pinInput" class="pin-field" maxlength="6" inputmode="numeric" placeholder="••••••" onkeydown="if(event.key==='Enter') loginWithPin()">
     <button class="btn btn-gold" onclick="loginWithPin()">UNLOCK DASHBOARD →</button>
     <button class="btn btn-google" onclick="loginWithGoogleAdmin()">Sign in with Google</button>
     <div class="err" id="errText"></div>
@@ -225,9 +228,8 @@
     appId: "1:26915012588:web:5b6c7e85ef018881e9cac9"
   };
 
-  // Oyage Admin Email & Secret PIN (Kamathi nam wenas karaganna)
   const ADMIN_EMAIL = "nimthakalakidu12@gmail.com";
-  const ADMIN_PIN = "2026";
+  const ADMIN_PIN = "120410";
 
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
@@ -246,10 +248,15 @@
 
   function loginWithPin() {
     const val = document.getElementById('pinInput').value.trim();
+    if (!/^\d{6}$/.test(val)) {
+      document.getElementById('errText').textContent = '⚠️ Enter 6-digit access code';
+      return;
+    }
     if (val === ADMIN_PIN) {
-      unlockUI('Authenticated via Admin PIN');
+      unlockUI('Authenticated Session');
     } else {
-      document.getElementById('errText').textContent = '❌ Invalid Admin PIN!';
+      document.getElementById('errText').textContent = '❌ Incorrect access code';
+      document.getElementById('pinInput').value = '';
     }
   }
 
@@ -259,7 +266,7 @@
       if (res.user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
         unlockUI('Admin: ' + res.user.email);
       } else {
-        document.getElementById('errText').textContent = '🚫 Unauthorized Google Account!';
+        document.getElementById('errText').textContent = '🚫 Unauthorized Google Account';
         auth.signOut();
       }
     }).catch(e => {
@@ -291,7 +298,6 @@
   }
 
   function startRealtimeListeners() {
-    // 1. Listen Admin Users
     db.ref('admin_users').on('value', snap => {
       const val = snap.val() || {};
       usersList = Object.keys(val).map(k => ({ ...val[k], id: k })).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
@@ -301,7 +307,6 @@
       renderUsers();
     });
 
-    // 2. Listen Live Rooms
     db.ref('live_rooms').on('value', snap => {
       const val = snap.val() || {};
       roomsList = Object.keys(val).map(k => ({ ...val[k], roomCode: k }));
@@ -309,7 +314,6 @@
       renderRooms();
     });
 
-    // 3. Listen User Backups
     db.ref('user_backups').on('value', snap => {
       const val = snap.val() || {};
       const keys = Object.keys(val);
