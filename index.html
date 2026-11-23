@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRIC CLASH • Admin Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<style>
+  :root {
+    --bg: #040509;
+    --glass: rgba(255, 255, 255, 0.045);
+    --border: rgba(255, 255, 255, 0.11);
+    --gold: #f5c542;
+    --emerald: #00e676;
+    --cyan: #38bdf8;
+    --danger: #ff2d55;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; }
+  body {
+    background: radial-gradient(circle at top right, #111b36, var(--bg) 55%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 18px;
+  }
+  .wrap { max-width: 1150px; margin: 0 auto; }
+
+  /* Login Overlay */
+  #loginGate {
+    position: fixed; inset: 0; background: rgba(4, 5, 9, 0.94); backdrop-filter: blur(22px);
+    display: flex; align-items: center; justify-content: center; z-index: 999; padding: 20px;
+  }
+  .login-box {
+    background: var(--glass); border: 1px solid var(--border); border-radius: 24px;
+    padding: 30px; width: 100%; max-width: 380px; text-align: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+  }
+  .login-box h2 { font-weight: 900; font-size: 22px; color: var(--gold); }
+  .login-box p { font-size: 13px; color: var(--muted); margin: 6px 0 20px; }
+  input {
+    width: 100%; padding: 12px 15px; border-radius: 12px; border: 1px solid var(--border);
+    background: rgba(0,0,0,0.45); color: #fff; font-size: 14px; outline: none; margin-bottom: 12px;
+  }
+  input:focus { border-color: var(--gold); }
+  .btn {
+    width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: 900;
+    cursor: pointer; font-size: 14px; transition: 0.2s;
+  }
+  .btn-gold { background: linear-gradient(135deg, var(--gold), #ff9f0a); color: #111; }
+  .btn-google { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid var(--border); margin-top: 10px; }
+  .err { color: var(--danger); font-size: 12px; margin-top: 10px; min-height: 16px; }
+
+  /* Topbar */
+  header {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+    background: var(--glass); border: 1px solid var(--border); backdrop-filter: blur(18px);
+    padding: 16px 20px; border-radius: 20px; margin-bottom: 18px;
+  }
+  .live-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--emerald);
+    box-shadow: 0 0 12px var(--emerald); animation: blink 1.4s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  .btn-sm {
+    padding: 7px 13px; border-radius: 10px; border: 1px solid var(--border);
+    background: rgba(255,255,255,0.06); color: #fff; font-weight: 800; font-size: 12px; cursor: pointer;
+  }
+  .btn-danger { background: rgba(255,45,85,0.16); color: var(--danger); border-color: rgba(255,45,85,0.35); }
+
+  /* Stats */
+  .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .card {
+    background: var(--glass); border: 1px solid var(--border); backdrop-filter: blur(16px);
+    border-radius: 20px; padding: 18px;
+  }
+  .card-lbl { font-size: 11px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; }
+  .card-num { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; margin-top: 5px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab {
+    padding: 9px 16px; border-radius: 12px; background: var(--glass); border: 1px solid var(--border);
+    color: var(--muted); font-weight: 800; font-size: 13px; cursor: pointer;
+  }
+  .tab.active { background: var(--gold); color: #111; border-color: var(--gold); }
+
+  /* Table */
+  .table-box { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; text-align: left; }
+  th { padding: 11px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); text-transform: uppercase; }
+  td { padding: 13px 10px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 800; }
+  .p-on { background: rgba(0,230,118,0.16); color: var(--emerald); }
+  .p-off { background: rgba(255,255,255,0.07); color: var(--muted); }
+  .p-type { background: rgba(56,189,248,0.14); color: var(--cyan); }
+  .p-ban { background: rgba(255,45,85,0.2); color: var(--danger); }
+</style>
+</head>
+<body>
+
+<div id="loginGate">
+  <div class="login-box">
+    <h2>⚡ CRIC CLASH ADMIN</h2>
+    <p>Enter Admin PIN or Sign in with Admin Google</p>
+    <input type="password" id="pinInput" placeholder="Admin Secret PIN (Default: 2026)">
+    <button class="btn btn-gold" onclick="loginWithPin()">UNLOCK DASHBOARD →</button>
+    <button class="btn btn-google" onclick="loginWithGoogleAdmin()">Sign in with Google</button>
+    <div class="err" id="errText"></div>
+  </div>
+</div>
+
+<div class="wrap" id="mainApp" style="display:none;">
+  <header>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="live-dot"></div>
+      <div>
+        <div style="font-weight:900;font-size:17px;color:var(--gold);">CRIC CLASH • COMMAND CENTER</div>
+        <div style="font-size:12px;color:var(--muted);" id="sessionLabel">Real-time Firebase Monitor</div>
+      </div>
+    </div>
+    <button class="btn-sm btn-danger" onclick="logout()">Logout</button>
+  </header>
+
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-lbl">Live Online Now</div>
+      <div class="card-num" style="color:var(--emerald);" id="cntOnline">0</div>
+    </div>
+    <div class="card">
+      <div class="card-lbl">Total App Users</div>
+      <div class="card-num" id="cntUsers">0</div>
+    </div>
+    <div class="card">
+      <div class="card-lbl">Signed-In Accounts</div>
+      <div class="card-num" style="color:var(--cyan);" id="cntAuth">0</div>
+    </div>
+    <div class="card">
+      <div class="card-lbl">Active Live Rooms</div>
+      <div class="card-num" style="color:var(--gold);" id="cntRooms">0</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tabBtn_users" onclick="switchTab('users')">👥 App Users & Logins</button>
+    <button class="tab" id="tabBtn_rooms" onclick="switchTab('rooms')">📡 Live Broadcast Rooms</button>
+    <button class="tab" id="tabBtn_backups" onclick="switchTab('backups')">☁️ Cloud Backups</button>
+  </div>
+
+  <!-- USERS PANEL -->
+  <div class="card" id="panel_users">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+      <h3 style="font-size:15px;">Registered & Guest Devices</h3>
+      <input type="text" id="userSearch" placeholder="Search player, email, device..." style="max-width:260px;margin:0;" oninput="renderUsers()">
+    </div>
+    <div class="table-box">
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>User / Player</th>
+            <th>Email / Device ID</th>
+            <th>Login Type</th>
+            <th>Device</th>
+            <th>Stats</th>
+            <th>Last Seen</th>
+            <th>Controls</th>
+          </tr>
+        </thead>
+        <tbody id="usersTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- LIVE ROOMS PANEL -->
+  <div class="card" id="panel_rooms" style="display:none;">
+    <h3 style="font-size:15px;margin-bottom:14px;">Active Live TV Broadcast Rooms</h3>
+    <div class="table-box">
+      <table>
+        <thead>
+          <tr>
+            <th>Room</th>
+            <th>Match</th>
+            <th>Score</th>
+            <th>Privacy</th>
+            <th>Updated</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="roomsTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CLOUD BACKUPS PANEL -->
+  <div class="card" id="panel_backups" style="display:none;">
+    <h3 style="font-size:15px;margin-bottom:14px;">User Cloud Backups</h3>
+    <div class="table-box">
+      <table>
+        <thead>
+          <tr>
+            <th>Account Key</th>
+            <th>Saved Players</th>
+            <th>Saved Matches</th>
+            <th>Last Backup</th>
+          </tr>
+        </thead>
+        <tbody id="backupsTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0vDSruAblivdCLm8o3s48AFuckFY_Oec",
+    authDomain: "cric-clash.firebaseapp.com",
+    databaseURL: "https://cric-clash-default-rtdb.firebaseio.com",
+    projectId: "cric-clash",
+    storageBucket: "cric-clash.firebasestorage.app",
+    messagingSenderId: "26915012588",
+    appId: "1:26915012588:web:5b6c7e85ef018881e9cac9"
+  };
+
+  // Oyage Admin Email & Secret PIN (Kamathi nam wenas karaganna)
+  const ADMIN_EMAIL = "nimthakalakidu12@gmail.com";
+  const ADMIN_PIN = "2026";
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.database();
+
+  let usersList = [];
+  let roomsList = [];
+
+  function unlockUI(label) {
+    sessionStorage.setItem('cc_admin_unlocked', label);
+    document.getElementById('loginGate').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('sessionLabel').textContent = label;
+    startRealtimeListeners();
+  }
+
+  function loginWithPin() {
+    const val = document.getElementById('pinInput').value.trim();
+    if (val === ADMIN_PIN) {
+      unlockUI('Authenticated via Admin PIN');
+    } else {
+      document.getElementById('errText').textContent = '❌ Invalid Admin PIN!';
+    }
+  }
+
+  function loginWithGoogleAdmin() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).then(res => {
+      if (res.user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        unlockUI('Admin: ' + res.user.email);
+      } else {
+        document.getElementById('errText').textContent = '🚫 Unauthorized Google Account!';
+        auth.signOut();
+      }
+    }).catch(e => {
+      document.getElementById('errText').textContent = e.message;
+    });
+  }
+
+  function logout() {
+    sessionStorage.removeItem('cc_admin_unlocked');
+    auth.signOut().catch(() => {});
+    location.reload();
+  }
+
+  if (sessionStorage.getItem('cc_admin_unlocked')) {
+    unlockUI(sessionStorage.getItem('cc_admin_unlocked'));
+  }
+
+  function switchTab(tab) {
+    ['users', 'rooms', 'backups'].forEach(t => {
+      document.getElementById('panel_' + t).style.display = (t === tab) ? 'block' : 'none';
+      document.getElementById('tabBtn_' + t).classList.toggle('active', t === tab);
+    });
+  }
+
+  function fmtDate(ts) {
+    if (!ts) return '-';
+    const d = new Date(ts);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function startRealtimeListeners() {
+    // 1. Listen Admin Users
+    db.ref('admin_users').on('value', snap => {
+      const val = snap.val() || {};
+      usersList = Object.keys(val).map(k => ({ ...val[k], id: k })).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+      document.getElementById('cntOnline').textContent = usersList.filter(u => u.online).length;
+      document.getElementById('cntUsers').textContent = usersList.length;
+      document.getElementById('cntAuth').textContent = usersList.filter(u => u.loginType && u.loginType !== 'Guest').length;
+      renderUsers();
+    });
+
+    // 2. Listen Live Rooms
+    db.ref('live_rooms').on('value', snap => {
+      const val = snap.val() || {};
+      roomsList = Object.keys(val).map(k => ({ ...val[k], roomCode: k }));
+      document.getElementById('cntRooms').textContent = roomsList.length;
+      renderRooms();
+    });
+
+    // 3. Listen User Backups
+    db.ref('user_backups').on('value', snap => {
+      const val = snap.val() || {};
+      const keys = Object.keys(val);
+      const tbody = document.getElementById('backupsTbody');
+      if (!keys.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">No cloud backups found</td></tr>';
+        return;
+      }
+      tbody.innerHTML = keys.map(k => {
+        const b = val[k];
+        return `<tr>
+          <td><b>${k}</b></td>
+          <td>${(b.players || []).length} Players</td>
+          <td>${b.totalAllTimeMatches || (b.matchHistory || []).length} Matches</td>
+          <td style="color:var(--muted);">${b.updatedAt || '-'}</td>
+        </tr>`;
+      }).join('');
+    });
+  }
+
+  function renderUsers() {
+    const q = document.getElementById('userSearch').value.toLowerCase();
+    const filtered = usersList.filter(u =>
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.device || '').toLowerCase().includes(q)
+    );
+    const tbody = document.getElementById('usersTbody');
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);">No users recorded yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(u => `
+      <tr>
+        <td>
+          ${u.banned ? '<span class="pill p-ban">BANNED</span>' :
+            (u.online ? '<span class="pill p-on">● ONLINE</span>' : '<span class="pill p-off">○ OFFLINE</span>')}
+        </td>
+        <td><b>${u.name || 'Player'}</b></td>
+        <td style="color:var(--muted);">${u.email || u.id}</td>
+        <td><span class="pill p-type">${u.loginType || 'Guest'}</span></td>
+        <td>${u.device || 'Web'}</td>
+        <td style="font-size:12px;">${u.playersCount || 0}P • ${u.matchesCount || 0}M</td>
+        <td style="color:var(--muted);font-size:12px;">${fmtDate(u.lastSeen)}</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn-sm" onclick="toggleBan('${u.id}', ${!u.banned})">${u.banned ? 'Unban' : 'Ban'}</button>
+          <button class="btn-sm btn-danger" onclick="removeUser('${u.id}')">✕</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderRooms() {
+    const tbody = document.getElementById('roomsTbody');
+    if (!roomsList.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);">No active live rooms</td></tr>';
+      return;
+    }
+    tbody.innerHTML = roomsList.map(r => `
+      <tr>
+        <td><b style="color:var(--gold);">#${r.roomCode}</b></td>
+        <td>${r.teamA || '-'} vs ${r.teamB || '-'}</td>
+        <td><b>${r.score || '0/0'}</b> (${r.overs || '0.0'})</td>
+        <td><span class="pill p-type">${(r.privacy || 'public').toUpperCase()}</span></td>
+        <td style="color:var(--muted);font-size:12px;">${fmtDate(r.updatedAt)}</td>
+        <td><button class="btn-sm btn-danger" onclick="closeRoom('${r.roomCode}')">Close Room</button></td>
+      </tr>
+    `).join('');
+  }
+
+  function toggleBan(id, state) {
+    db.ref('admin_users/' + id).update({ banned: state });
+  }
+
+  function removeUser(id) {
+    if (confirm('Delete this user entry?')) db.ref('admin_users/' + id).remove();
+  }
+
+  function closeRoom(code) {
+    if (confirm('Force close Room #' + code + '?')) db.ref('live_rooms/' + code).remove();
+  }
+</script>
+</body>
+</html>
