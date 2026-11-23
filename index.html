@@ -29,9 +29,8 @@
   }
   .wrap { max-width: 1150px; margin: 0 auto; }
 
-  /* Login Overlay */
   #loginGate {
-    position: fixed; inset: 0; background: rgba(4, 5, 9, 0.94); backdrop-filter: blur(22px);
+    position: fixed; inset: 0; background: rgba(4, 5, 9, 0.96); backdrop-filter: blur(22px);
     display: flex; align-items: center; justify-content: center; z-index: 999; padding: 20px;
   }
   .login-box {
@@ -46,9 +45,7 @@
     background: rgba(0,0,0,0.45); color: #fff; font-size: 14px; outline: none; margin-bottom: 12px;
   }
   input:focus { border-color: var(--gold); }
-  .pin-field {
-    text-align: center; font-size: 20px; letter-spacing: 6px; font-weight: 800;
-  }
+  .pin-field { text-align: center; font-size: 20px; letter-spacing: 6px; font-weight: 800; }
   .btn {
     width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: 900;
     cursor: pointer; font-size: 14px; transition: 0.2s;
@@ -57,7 +54,6 @@
   .btn-google { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid var(--border); margin-top: 10px; }
   .err { color: var(--danger); font-size: 12px; margin-top: 10px; min-height: 16px; }
 
-  /* Topbar */
   header {
     display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
     background: var(--glass); border: 1px solid var(--border); backdrop-filter: blur(18px);
@@ -74,7 +70,6 @@
   }
   .btn-danger { background: rgba(255,45,85,0.16); color: var(--danger); border-color: rgba(255,45,85,0.35); }
 
-  /* Stats */
   .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 18px; }
   .card {
     background: var(--glass); border: 1px solid var(--border); backdrop-filter: blur(16px);
@@ -83,7 +78,6 @@
   .card-lbl { font-size: 11px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; }
   .card-num { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; margin-top: 5px; }
 
-  /* Tabs */
   .tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
   .tab {
     padding: 9px 16px; border-radius: 12px; background: var(--glass); border: 1px solid var(--border);
@@ -91,7 +85,6 @@
   }
   .tab.active { background: var(--gold); color: #111; border-color: var(--gold); }
 
-  /* Table */
   .table-box { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; text-align: left; }
   th { padding: 11px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); text-transform: uppercase; }
@@ -153,10 +146,9 @@
     <button class="tab" id="tabBtn_backups" onclick="switchTab('backups')">☁️ Cloud Backups</button>
   </div>
 
-  <!-- USERS PANEL -->
   <div class="card" id="panel_users">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-      <h3 style="font-size:15px;">Registered & Guest Devices</h3>
+      <h3 style="font-size:15px;">Registered & Active Users</h3>
       <input type="text" id="userSearch" placeholder="Search player, email, device..." style="max-width:260px;margin:0;" oninput="renderUsers()">
     </div>
     <div class="table-box">
@@ -165,7 +157,7 @@
           <tr>
             <th>Status</th>
             <th>User / Player</th>
-            <th>Email / Device ID</th>
+            <th>Email / ID</th>
             <th>Login Type</th>
             <th>Device</th>
             <th>Stats</th>
@@ -178,7 +170,6 @@
     </div>
   </div>
 
-  <!-- LIVE ROOMS PANEL -->
   <div class="card" id="panel_rooms" style="display:none;">
     <h3 style="font-size:15px;margin-bottom:14px;">Active Live TV Broadcast Rooms</h3>
     <div class="table-box">
@@ -198,7 +189,6 @@
     </div>
   </div>
 
-  <!-- CLOUD BACKUPS PANEL -->
   <div class="card" id="panel_backups" style="display:none;">
     <h3 style="font-size:15px;margin-bottom:14px;">User Cloud Backups</h3>
     <div class="table-box">
@@ -235,11 +225,12 @@
   const auth = firebase.auth();
   const db = firebase.database();
 
-  let usersList = [];
+  let adminUsersMap = {};
+  let backupUsersMap = {};
   let roomsList = [];
 
   function unlockUI(label) {
-    sessionStorage.setItem('cc_admin_unlocked', label);
+    sessionStorage.setItem('cc_admin_v2_auth', label);
     document.getElementById('loginGate').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('sessionLabel').textContent = label;
@@ -275,13 +266,13 @@
   }
 
   function logout() {
-    sessionStorage.removeItem('cc_admin_unlocked');
+    sessionStorage.removeItem('cc_admin_v2_auth');
     auth.signOut().catch(() => {});
     location.reload();
   }
 
-  if (sessionStorage.getItem('cc_admin_unlocked')) {
-    unlockUI(sessionStorage.getItem('cc_admin_unlocked'));
+  if (sessionStorage.getItem('cc_admin_v2_auth')) {
+    unlockUI(sessionStorage.getItem('cc_admin_v2_auth'));
   }
 
   function switchTab(tab) {
@@ -293,18 +284,69 @@
 
   function fmtDate(ts) {
     if (!ts) return '-';
+    if (typeof ts === 'string') return ts;
     const d = new Date(ts);
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
+  function getMergedUsers() {
+    const merged = { ...backupUsersMap, ...adminUsersMap };
+    return Object.keys(merged).map(k => ({ ...merged[k], id: k })).sort((a, b) => {
+      if (a.online && !b.online) return -1;
+      if (!a.online && b.online) return 1;
+      return (Number(b.lastSeen) || 0) - (Number(a.lastSeen) || 0);
+    });
+  }
+
+  function refreshUserStatsAndTable() {
+    const all = getMergedUsers();
+    document.getElementById('cntOnline').textContent = all.filter(u => u.online === true).length;
+    document.getElementById('cntUsers').textContent = all.length;
+    document.getElementById('cntAuth').textContent = all.filter(u => u.loginType && u.loginType !== 'Guest').length;
+    renderUsers();
+  }
+
   function startRealtimeListeners() {
     db.ref('admin_users').on('value', snap => {
+      adminUsersMap = snap.val() || {};
+      refreshUserStatsAndTable();
+    });
+
+    db.ref('user_backups').on('value', snap => {
       const val = snap.val() || {};
-      usersList = Object.keys(val).map(k => ({ ...val[k], id: k })).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
-      document.getElementById('cntOnline').textContent = usersList.filter(u => u.online).length;
-      document.getElementById('cntUsers').textContent = usersList.length;
-      document.getElementById('cntAuth').textContent = usersList.filter(u => u.loginType && u.loginType !== 'Guest').length;
-      renderUsers();
+      backupUsersMap = {};
+      Object.keys(val).forEach(k => {
+        const b = val[k];
+        const readableEmail = k.replace(/_gmail_com$/i, '@gmail.com').replace(/_/g, '.');
+        backupUsersMap['user_' + k] = {
+          id: 'user_' + k,
+          name: (b.players && b.players[0]) ? b.players[0].name : readableEmail.split('@')[0],
+          email: readableEmail,
+          loginType: 'Cloud Account',
+          device: 'Synced App',
+          playersCount: (b.players || []).length,
+          matchesCount: b.totalAllTimeMatches || (b.matchHistory || []).length,
+          online: false,
+          lastSeen: b.updatedAt || 'Backed up'
+        };
+      });
+      refreshUserStatsAndTable();
+
+      const keys = Object.keys(val);
+      const tbody = document.getElementById('backupsTbody');
+      if (!keys.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">No cloud backups found</td></tr>';
+      } else {
+        tbody.innerHTML = keys.map(k => {
+          const b = val[k];
+          return `<tr>
+            <td><b>${k}</b></td>
+            <td>${(b.players || []).length} Players</td>
+            <td>${b.totalAllTimeMatches || (b.matchHistory || []).length} Matches</td>
+            <td style="color:var(--muted);">${b.updatedAt || '-'}</td>
+          </tr>`;
+        }).join('');
+      }
     });
 
     db.ref('live_rooms').on('value', snap => {
@@ -313,37 +355,18 @@
       document.getElementById('cntRooms').textContent = roomsList.length;
       renderRooms();
     });
-
-    db.ref('user_backups').on('value', snap => {
-      const val = snap.val() || {};
-      const keys = Object.keys(val);
-      const tbody = document.getElementById('backupsTbody');
-      if (!keys.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">No cloud backups found</td></tr>';
-        return;
-      }
-      tbody.innerHTML = keys.map(k => {
-        const b = val[k];
-        return `<tr>
-          <td><b>${k}</b></td>
-          <td>${(b.players || []).length} Players</td>
-          <td>${b.totalAllTimeMatches || (b.matchHistory || []).length} Matches</td>
-          <td style="color:var(--muted);">${b.updatedAt || '-'}</td>
-        </tr>`;
-      }).join('');
-    });
   }
 
   function renderUsers() {
     const q = document.getElementById('userSearch').value.toLowerCase();
-    const filtered = usersList.filter(u =>
+    const filtered = getMergedUsers().filter(u =>
       (u.name || '').toLowerCase().includes(q) ||
       (u.email || '').toLowerCase().includes(q) ||
       (u.device || '').toLowerCase().includes(q)
     );
     const tbody = document.getElementById('usersTbody');
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);">No users recorded yet</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);">No users found yet. Make sure tracker code is added to script.js!</td></tr>';
       return;
     }
     tbody.innerHTML = filtered.map(u => `
